@@ -199,9 +199,57 @@ let sellers=getData("daraz_sellers");
 let sales=getData("daraz_sales");
 let currentSeller=null;
 
+
 function safe(v){
- return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ return String(v??"").replace(/[&<>"']/g,c=>({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#39;"
+ }[c]));
 }
+
+function getProductPhotos(p){
+ return Array.isArray(p.images)&&p.images.length
+ ?p.images
+ :(p.image?[p.image]:[]);
+}
+
+function productPhotosHTML(p){
+ const photos=getProductPhotos(p);
+ if(!photos.length){
+  return '<div class="product-photos">ছবি নেই</div>';
+ }
+ return `<div class="product-photos">${
+ photos.map(src=>`<img src="${src}" alt="পণ্যের ছবি">`).join("")
+ }</div>`;
+}
+
+function compressProductImage(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>{
+   const img=new Image();
+   img.onload=()=>{
+    const canvas=document.createElement("canvas");
+    const scale=Math.min(1,900/Math.max(img.width,img.height));
+    canvas.width=Math.round(img.width*scale);
+    canvas.height=Math.round(img.height*scale);
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    resolve(canvas.toDataURL("image/jpeg",0.72));
+   };
+   img.onerror=reject;
+   img.src=reader.result;
+  };
+  reader.onerror=reject;
+  reader.readAsDataURL(file);
+ });
+ }
+                            
 function showPage(id){
  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
  const page=$(id); if(!page)return;
