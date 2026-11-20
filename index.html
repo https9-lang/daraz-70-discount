@@ -61,6 +61,23 @@ input:focus,textarea:focus{border-color:var(--o);background:white}
 footer{text-align:center;color:#888;font-size:12px;padding:25px 10px}
 a{color:inherit}
 @media(min-width:650px){.grid{grid-template-columns:repeat(3,1fr)}}
+ .product-photos{
+ display:flex;
+ gap:5px;
+ overflow-x:auto;
+ padding:8px;
+ background:white;
+}
+.product-photos img{
+ width:100%;
+ max-width:100%;
+ height:130px;
+ flex:1;
+ min-width:0;
+ object-fit:contain;
+ border-radius:8px;
+ background:#fff;
+}
 </style>
 </head>
 <body>
@@ -99,7 +116,7 @@ a{color:inherit}
  <label>মোবাইল নম্বর</label><input id="regPhone" type="tel" placeholder="01XXXXXXXXX">
  <label>জন্ম সাল</label><input id="regYear" type="number" placeholder="2001">
  <label>ঠিকানা</label><input id="regAddress" placeholder="আপনার ঠিকানা">
- <label>বিকাশ নম্বর</label><input id="regBkash" placeholder="বিকাশ নম্বর">
+ <label>বিকাশ নম্বর/নগদ নাম্বার</label><input id="regBkash" placeholder="বিকাশ নম্বর">
  <label>পাসওয়ার্ড</label><input id="regPass" type="password" placeholder="পাসওয়ার্ড">
  <button class="full" onclick="registerSeller()">অ্যাকাউন্ট তৈরি করুন →</button>
  </div>
@@ -137,7 +154,9 @@ a{color:inherit}
  <label>পূর্বের দাম (টাকা)</label><input id="pOldPrice" type="number" min="0" placeholder="যেমন ১০০০">
  <label>বর্তমান দাম (টাকা)</label><input id="pPrice" type="number" min="0" placeholder="যেমন ৭৫০">
  <div id="discountPreview" class="small">ছাড়ের হিসাব এখানে দেখা যাবে।</div>
- <label>গ্যালারি থেকে পণ্যের ছবি নির্বাচন</label><input id="pImage" type="file" accept="image/*">
+ <label>পণ্যের ছবি নির্বাচন (সর্বোচ্চ ৩টি)</label>
+<input id="pImage" type="file" accept="image/*" multiple>
+<small class="small">১টি, ২টি অথবা ৩টি ছবি দিতে পারবেন।</small>
  <label>Daraz পণ্যের লিংক</label><input id="pLink" placeholder="https://...">
  <label>প্রতি বিক্রিতে বিক্রেতার কমিশন (টাকা)</label><input id="pCommission" type="number" min="0" placeholder="যেমন ১০">
  <button class="full" onclick="addProduct()">➕ পণ্য প্রকাশ করুন</button>
@@ -205,7 +224,7 @@ function renderPublic(){
  if(!list.length){box.innerHTML="<p>😔 কোনো পণ্য পাওয়া যায়নি।</p>";return;}
  list.forEach(p=>{
   const discount=discountPercent(Number(p.oldPrice),Number(p.price));
-  box.innerHTML+=`<div class="product"><img src="${p.image}" alt="পণ্যের ছবি"><div class="info"><h4>${safe(p.name)}</h4><div class="old">৳${Number(p.oldPrice||p.price)}</div><div class="now">৳${Number(p.price)}</div>${discount>0?`<div class="discount">${discount}% ছাড়</div>`:""}<button class="buy" onclick="buyProduct('${p.id}')">🛒 Buy Now</button></div></div>`;
+  box.innerHTML+=`<div class="product">${productPhotosHTML(p)}<div class="info"><h4>${safe(p.name)}</h4><div class="old">৳${Number(p.oldPrice||p.price)}</div><div class="now">৳${Number(p.price)}</div>${discount>0?`<div class="discount">${discount}% ছাড়</div>`:""}<button class="buy" onclick="buyProduct('${p.id}')">🛒 Buy Now</button></div></div>`;
  });
 }
 function buyProduct(id){
@@ -238,18 +257,73 @@ function sellerLogin(){
  currentSeller=seller;showPage("sellerDashboard");
 }
 function sellerLogout(){currentSeller=null;showPage("home");}
+
 function renderSeller(){
  if(!currentSeller)return;
- products=getData("daraz_products");sales=getData("daraz_sales");
+
+ products=getData("daraz_products");
+ sales=getData("daraz_sales");
+
  $("sellerWelcome").textContent="স্বাগতম, "+currentSeller.name;
+
  const mine=sales.filter(s=>s.sellerId===currentSeller.id&&s.status==="confirmed");
- const total=mine.reduce((a,s)=>a+Number(s.commission),0),paid=mine.filter(s=>s.paid).reduce((a,s)=>a+Number(s.commission),0);
- $("sellerTotal").textContent="৳"+total;$("sellerPaid").textContent="৳"+paid;$("sellerDue").textContent="৳"+(total-paid);$("sellerCount").textContent=mine.length;
+
+ const total=mine.reduce((a,s)=>a+Number(s.commission),0);
+ const paid=mine.filter(s=>s.paid).reduce((a,s)=>a+Number(s.commission),0);
+
+ $("sellerTotal").textContent="৳"+total;
+ $("sellerPaid").textContent="৳"+paid;
+ $("sellerDue").textContent="৳"+(total-paid);
+ $("sellerCount").textContent=mine.length;
+
  $("sellerProducts").innerHTML="";
- products.forEach(p=>{$("sellerProducts").innerHTML+=`<div class="item"><b>${safe(p.name)}</b><p>পূর্বের দাম: ৳${Number(p.oldPrice||p.price)}<br>বর্তমান দাম: ৳${Number(p.price)}</p><h3>আপনার কমিশন: ৳${Number(p.commission)}</h3><button onclick="copyLink('${p.id}')">🔗 লিংক কপি</button> <button class="green" onclick="reportSale('${p.id}')">বিক্রি রিপোর্ট</button></div>`;});
- const all=sales.filter(s=>s.sellerId===currentSeller.id);$("sellerSales").innerHTML=all.length?"":"এখনো কোনো রিপোর্ট নেই।";
- all.forEach(s=>{$("sellerSales").innerHTML+=`<div class="item"><b>${safe(s.productName)}</b><p>কমিশন: ৳${Number(s.commission)}<br>অবস্থা: ${s.status==="confirmed"?"অনুমোদিত":"যাচাই অপেক্ষমাণ"}<br>পেমেন্ট: ${s.paid?"পরিশোধ হয়েছে":"বাকি"}</p></div>`;});
-}
+
+ products.forEach(p=>{
+  $("sellerProducts").innerHTML+=`
+  <div class="item">
+
+   <img src="${p.image||''}"
+   alt="পণ্যের ছবি"
+   style="width:110px;height:110px;object-fit:contain;border-radius:10px;background:#fff;padding:5px;display:block;margin-bottom:10px;">
+
+   <b>${safe(p.name)}</b>
+
+   <p>
+   পূর্বের দাম: ৳${Number(p.oldPrice||p.price)}
+   <br>
+   বর্তমান দাম: ৳${Number(p.price)}
+   </p>
+
+   <h3>আপনার কমিশন: ৳${Number(p.commission)}</h3>
+
+   <button onclick="copyLink('${p.id}')">🔗 লিংক কপি</button>
+
+   <button class="green" onclick="reportSale('${p.id}')">
+   বিক্রি রিপোর্ট
+   </button>
+
+  </div>`;
+ });
+
+ const all=sales.filter(s=>s.sellerId===currentSeller.id);
+
+ $("sellerSales").innerHTML=all.length?"":"এখনো কোনো রিপোর্ট নেই।";
+
+ all.forEach(s=>{
+  $("sellerSales").innerHTML+=`
+  <div class="item">
+  <b>${safe(s.productName)}</b>
+  <p>
+  কমিশন: ৳${Number(s.commission)}
+  <br>
+  অবস্থা: ${s.status==="confirmed"?"অনুমোদিত":"যাচাই অপেক্ষমাণ"}
+  <br>
+  পেমেন্ট: ${s.paid?"পরিশোধ হয়েছে":"বাকি"}
+  </p>
+  </div>`;
+ });
+ }
+ 
 function copyLink(id){
  const p=getData("daraz_products").find(x=>x.id===id);if(!p)return;
  if(navigator.clipboard){navigator.clipboard.writeText(p.link).then(()=>alert("লিংক কপি হয়েছে")).catch(()=>prompt("লিংক কপি করুন",p.link));}
@@ -284,22 +358,82 @@ async function adminLogout(){
  showPage("home");
 }
 
-function addProduct(){
- const name=$("pName").value.trim(),oldPrice=Number($("pOldPrice").value),price=Number($("pPrice").value),link=$("pLink").value.trim(),commission=Number($("pCommission").value),file=$("pImage").files[0];
- if(!name||!oldPrice||!price||!link||!file||!Number.isFinite(commission)||commission<0){alert("সব তথ্য সঠিকভাবে পূরণ করুন");return;}
- if(oldPrice<price){alert("বর্তমান দাম পূর্বের দামের চেয়ে কম বা সমান হতে হবে");return;}
- if(!/^https?:\/\//i.test(link)){alert("সঠিক Daraz লিংক দিন");return;}
- if(file.size>5*1024*1024){alert("ছবির সাইজ ৫ MB-এর কম হতে হবে");return;}
- const reader=new FileReader();
- reader.onload=function(){
-  try{
-   products=getData("daraz_products");products.push({id:Date.now().toString(),name,oldPrice,price,link,commission,image:reader.result});saveData("daraz_products",products);
-   $("pName").value="";$("pOldPrice").value="";$("pPrice").value="";$("pLink").value="";$("pCommission").value="";$("pImage").value="";updateDiscountPreview();
-   alert("পণ্য সফলভাবে প্রকাশ হয়েছে!");renderAdmin();
-  }catch(e){alert("ছবিটি বা পণ্যটি সংরক্ষণ করা যায়নি। ব্রাউজারের স্টোরেজ পূর্ণ হতে পারে।");}
- };
- reader.onerror=()=>alert("ছবি পড়া যায়নি। আবার চেষ্টা করুন।");reader.readAsDataURL(file);
-}
+
+async function addProduct(){
+
+ const name=$("pName").value.trim();
+ const oldPrice=Number($("pOldPrice").value);
+ const price=Number($("pPrice").value);
+ const link=$("pLink").value.trim();
+ const commission=Number($("pCommission").value);
+ const files=Array.from($("pImage").files);
+
+ if(!name||!oldPrice||!price||!link||files.length===0||
+ !Number.isFinite(commission)||commission<0){
+  alert("সব তথ্য সঠিকভাবে পূরণ করুন এবং অন্তত ১টি ছবি দিন");
+  return;
+ }
+
+ if(files.length>3){
+  alert("সর্বোচ্চ ৩টি ছবি দিতে পারবেন");
+  return;
+ }
+
+ if(oldPrice<price){
+  alert("বর্তমান দাম পূর্বের দামের চেয়ে কম হতে হবে");
+  return;
+ }
+
+ if(!/^https?:\/\//i.test(link)){
+  alert("সঠিক Daraz লিংক দিন");
+  return;
+ }
+
+ if(files.some(file=>file.size>5*1024*1024)){
+  alert("প্রতিটি ছবির সাইজ ৫ MB-এর কম হতে হবে");
+  return;
+ }
+
+ try{
+
+  const images=await Promise.all(
+   files.map(file=>compressProductImage(file))
+  );
+
+  products=getData("daraz_products");
+
+  products.push({
+   id:Date.now().toString(),
+   name,
+   oldPrice,
+   price,
+   link,
+   commission,
+   images,
+   image:images[0]
+  });
+
+  saveData("daraz_products",products);
+
+  $("pName").value="";
+  $("pOldPrice").value="";
+  $("pPrice").value="";
+  $("pLink").value="";
+  $("pCommission").value="";
+  $("pImage").value="";
+
+  updateDiscountPreview();
+
+  alert("পণ্য ও ছবিগুলো সফলভাবে প্রকাশ হয়েছে!");
+
+  renderAdmin();
+
+ }catch(e){
+  console.error(e);
+  alert("ছবি সংরক্ষণ করা যায়নি। ব্রাউজারের স্টোরেজ পরীক্ষা করুন।");
+ }
+ }
+  
 function renderAdmin(){
  products=getData("daraz_products");sellers=getData("daraz_sellers");sales=getData("daraz_sales");
  $("adminProducts").innerHTML=products.length?"":"কোনো পণ্য নেই";
